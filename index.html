@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Conspirando</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; background: #f4f4f4; }
+    .post, .comment { background: #fff; padding: 15px; margin: 10px 0; border-radius: 8px; }
+    button { padding: 6px 12px; border: none; border-radius: 4px; background: #007bff; color: #fff; cursor: pointer; }
+    button:disabled { background: #aaa; }
+    input, textarea { width: 100%; padding: 8px; margin: 5px 0; }
+    #ownerPanel { display: none; background: #e0f7fa; padding: 10px; border-radius: 8px; margin: 15px 0; }
+  </style>
+</head>
+<body>
+  <h1>📜 Conspirando</h1>
+  <p>Leia, curta e comente (até 120 caracteres). Apenas o dono pode postar.</p>
+
+  <div id="loginPanel">
+    <h3>Login do dono</h3>
+    <input type="email" id="email" placeholder="Email">
+    <input type="password" id="password" placeholder="Senha">
+    <button onclick="login()">Entrar</button>
+    <button onclick="logout()">Sair</button>
+  </div>
+
+  <div id="ownerPanel">
+    <h3>Publicar novo post</h3>
+    <textarea id="newPost" placeholder="Escreva seu post..."></textarea>
+    <button onclick="addPost()">Publicar</button>
+  </div>
+
+  <h2>📰 Posts recentes</h2>
+  <div id="posts"></div>
+
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+  <script>
+    // COLOQUE SEU CONFIG DO FIREBASE AQUI (Passo 6)
+    const firebaseConfig = {
+      apiKey: "COLOQUE_AQUI",
+      authDomain: "COLOQUE_AQUI.firebaseapp.com",
+      projectId: "COLOQUE_AQUI",
+      storageBucket: "COLOQUE_AQUI.appspot.com",
+      messagingSenderId: "COLOQUE_AQUI",
+      appId: "COLOQUE_AQUI"
+    };
+    const OWNER_EMAIL = "seu-email@exemplo.com";
+
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+
+    auth.onAuthStateChanged(user => {
+      if (user && user.email === OWNER_EMAIL) {
+        document.getElementById("ownerPanel").style.display = "block";
+      } else {
+        document.getElementById("ownerPanel").style.display = "none";
+      }
+    });
+
+    function login() {
+      const email = document.getElementById("email").value;
+      const password = document.getElementById("password").value;
+      auth.signInWithEmailAndPassword(email, password).catch(e => alert(e.message));
+    }
+
+    function logout() {
+      auth.signOut();
+    }
+
+    async function addPost() {
+      const text = document.getElementById("newPost").value.trim();
+      if (!text) return;
+      await db.collection("posts").add({
+        text: text,
+        created: firebase.firestore.FieldValue.serverTimestamp(),
+        likes: 0
+      });
+      document.getElementById("newPost").value = "";
+    }
+
+    function renderPosts() {
+      db.collection("posts").orderBy("created", "desc").onSnapshot(snapshot => {
+        const postsDiv = document.getElementById("posts");
+        postsDiv.innerHTML = "";
+        snapshot.forEach(doc => {
+          const post = doc.data();
+          const postDiv = document.createElement("div");
+          postDiv.className = "post";
+          postDiv.innerHTML = `
+            <p>${post.text}</p>
+            <button onclick="likePost('${doc.id}')">Curtir (${post.likes || 0})</button>
+            <div>
+              <input id="comment-${doc.id}" maxlength="120" placeholder="Seu comentário (até 120 caracteres)">
+              <button onclick="addComment('${doc.id}')">Comentar</button>
+            </div>
+            <div id="comments-${doc.id}"></div>
+          `;
+          postsDiv.appendChild(postDiv);
+          loadComments(doc.id);
+        });
+      });
+    }
+
+    async function likePost(id) {
+      const likeKey = "liked_" + id;
+      if (localStorage.getItem(likeKey)) return alert("Você já curtiu este post.");
+      await db.collection("posts").doc(id).update({
+        likes: firebase.firestore.FieldValue.increment(1)
+      });
+      localStorage.setItem(likeKey, "1");
+    }
+
+    async function addComment(postId) {
+      const input = document.getElementById("comment-" + postId);
+      const text = input.value.trim();
+      if (!text) return;
+      await db.collection("posts").doc(postId).collection("comments").add({
+        text: text,
+        created: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      input.value = "";
+    }
+
+    function loadComments(postId) {
+      db.collection("posts").doc(postId).collection("comments").orderBy("created", "asc")
+        .onSnapshot(snapshot => {
+          const commentsDiv = document.getElementById("comments-" + postId);
+          commentsDiv.innerHTML = "";
+          snapshot.forEach(doc => {
+            const c = doc.data();
+            const cDiv = document.createElement("div");
+            cDiv.className = "comment";
+            cDiv.textContent = c.text;
+            commentsDiv.appendChild(cDiv);
+          });
+        });
+    }
+
+    renderPosts();
+  </script>
+</body>
+</html>
