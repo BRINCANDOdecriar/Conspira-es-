@@ -14,7 +14,20 @@
   </style>
 </head>
 <body>
-  <h1>📜 Conspirando</h1>
+  <h1>📜 Conspirando</h1><!-- Formulário de login -->
+<div id="loginDiv">
+  <h2>Login do Administrador</h2>
+  <input type="email" id="email" placeholder="Seu email">
+  <input type="password" id="password" placeholder="Sua senha">
+  <button onclick="login()">Entrar</button>
+</div>
+
+<!-- Área de postar (só aparece se estiver logado) -->
+<div id="postDiv" style="display:none;">
+  <h2>Novo Post</h2>
+  <textarea id="postContent" placeholder="Escreva seu post..."></textarea>
+  <button onclick="createPost()">Postar</button>
+</div>
   <p>Leia, curta e comente (até 120 caracteres). Apenas o dono pode postar.</p>
 
   <div id="loginPanel">
@@ -144,7 +157,37 @@
 
     renderPosts();
   </script>
-<script type="module">
+<script type="module">import { signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
+import { collection, addDoc } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
+
+// Função de login
+window.login = async function() {
+  const email = document.getElementById("email").value;
+  const password = document.getElementById("password").value;
+  try {
+    await signInWithEmailAndPassword(auth, email, password);
+    document.getElementById("loginDiv").style.display = "none";
+    document.getElementById("postDiv").style.display = "block";
+  } catch (error) {
+    alert("Erro no login: " + error.message);
+  }
+}
+
+// Função de criar post
+window.createPost = async function() {
+  const content = document.getElementById("postContent").value;
+  if (content.trim() === "") return alert("Escreva algo!");
+  try {
+    await addDoc(collection(db, "posts"), {
+      texto: content,
+      data: new Date()
+    });
+    alert("Post criado com sucesso!");
+    document.getElementById("postContent").value = "";
+  } catch (error) {
+    alert("Erro ao postar: " + error.message);
+  }
+}
   // Import the functions you need from the SDKs you need
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
   // TODO: Add SDKs for Firebase products that you want to use
